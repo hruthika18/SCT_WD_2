@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SkillCraft Stopwatch</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#f0eef8;
+  --bg2:#e8e4f5;
+  --surface:#ffffff;
+  --surface2:#f7f5ff;
+  --accent:#6c5ce7;
+  --accent-light:#a29bfe;
+  --accent-glow:rgba(108,92,231,0.18);
+  --pink:#e84393;
+  --teal:#00b894;
+  --amber:#f9a825;
+  --text:#1e1a3a;
+  --muted:#8b87aa;
+  --border:#ddd9f5;
+  --shadow:0 8px 32px rgba(108,92,231,0.10);
+  --font-head:'Outfit',sans-serif;
+  --font-mono:'DM Mono',monospace;
+  --r:20px;
+}
+html,body{height:100%;min-height:600px;}
+body{
+  background:var(--bg);
+  font-family:var(--font-head);
+  color:var(--text);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:24px 16px 40px;
+  min-height:100vh;
+  position:relative;
+  overflow-x:hidden;
+}
+
+/* ── background orbs ── */
+.orb{position:fixed;border-radius:50%;pointer-events:none;z-index:0;}
+.orb1{width:420px;height:420px;background:radial-gradient(circle,rgba(162,155,254,0.22),transparent 70%);top:-80px;right:-100px;}
+.orb2{width:320px;height:320px;background:radial-gradient(circle,rgba(232,67,147,0.1),transparent 70%);bottom:40px;left:-60px;}
+.orb3{width:200px;height:200px;background:radial-gradient(circle,rgba(0,184,148,0.1),transparent 70%);top:40%;right:5%;}
+
+/* ── header ── */
+header{position:relative;z-index:1;text-align:center;margin-bottom:28px;animation:fadeDown 0.6s ease both;}
+.brand{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:6px;}
+.brand-mark{width:36px;height:36px;background:var(--accent);border-radius:10px;display:grid;place-items:center;}
+.brand-mark svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2.5;}
+.brand-name{font-size:1rem;font-weight:700;color:var(--text);letter-spacing:-0.01em;}
+.brand-name span{color:var(--accent);}
+header h1{font-size:0.75rem;font-weight:400;color:var(--muted);letter-spacing:0.12em;text-transform:uppercase;}
+
+/* ── main card ── */
+.card{
+  position:relative;z-index:1;
+  background:var(--surface);
+  border-radius:28px;
+  box-shadow:var(--shadow),0 1px 0 rgba(255,255,255,0.8) inset;
+  padding:36px 40px 32px;
+  width:100%;max-width:480px;
+  border:1px solid var(--border);
+  animation:fadeUp 0.6s 0.1s ease both;
+}
+
+/* ── ring clock ── */
+.clock-wrap{position:relative;width:260px;height:260px;margin:0 auto 32px;}
+.ring-svg{position:absolute;inset:0;width:100%;height:100%;}
+.ring-track{fill:none;stroke:var(--bg2);stroke-width:8;}
+.ring-progress{fill:none;stroke-width:8;stroke-linecap:round;transform-origin:center;transform:rotate(-90deg);transition:stroke-dashoffset 0.1s linear,stroke 0.4s;}
+.ring-sec{stroke:var(--accent);stroke-dasharray:628;stroke-dashoffset:628;}
+.ring-min{stroke:var(--accent-light);stroke-dasharray:565;stroke-dashoffset:565;stroke-width:5;}
+.ring-hr{stroke:#ddd9f5;stroke-dasharray:503;stroke-dashoffset:503;stroke-width:3;}
+
+.clock-inner{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:2px;
+}
+.time-display{
+  font-family:var(--font-mono);
+  font-size:2.9rem;
+  font-weight:400;
+  color:var(--text);
+  letter-spacing:0.04em;
+  line-height:1;
+}
+.time-display .ms{font-size:1.5rem;color:var(--muted);font-weight:300;}
+.status-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:0.7rem;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;
+  padding:3px 10px;border-radius:100px;
+  background:var(--bg2);color:var(--muted);
+  transition:all 0.3s;
+}
+.status-badge .dot{width:5px;height:5px;border-radius:50%;background:var(--muted);transition:background 0.3s;}
+.status-badge.running{background:rgba(0,184,148,0.12);color:var(--teal);}
+.status-badge.running .dot{background:var(--teal);animation:blink 1s infinite;}
+.status-badge.paused{background:rgba(249,168,37,0.12);color:var(--amber);}
+.status-badge.paused .dot{background:var(--amber);}
+
+/* tick marks on ring */
+.ticks{position:absolute;inset:0;}
+.tick{position:absolute;width:2px;height:8px;background:var(--border);border-radius:1px;left:50%;top:6px;transform-origin:50% 124px;}
+.tick.major{height:12px;background:var(--accent-light);width:2.5px;}
+
+/* ── buttons ── */
+.controls{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:24px;}
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  font-family:var(--font-head);font-size:0.875rem;font-weight:600;
+  border:none;cursor:pointer;border-radius:14px;
+  transition:transform 0.15s,box-shadow 0.15s,background 0.2s,color 0.2s;
+  white-space:nowrap;
+}
+.btn:active{transform:scale(0.95)!important;}
+
+.btn-start{
+  padding:14px 36px;
+  background:var(--accent);color:#fff;
+  box-shadow:0 4px 20px rgba(108,92,231,0.35);
+  font-size:0.95rem;
+}
+.btn-start:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(108,92,231,0.45);}
+.btn-start.running{background:var(--amber);box-shadow:0 4px 20px rgba(249,168,37,0.35);}
+.btn-start.running:hover{box-shadow:0 8px 28px rgba(249,168,37,0.45);}
+
+.btn-lap{
+  padding:14px 22px;
+  background:var(--surface2);color:var(--accent);
+  border:1.5px solid var(--border);
+}
+.btn-lap:hover{background:var(--bg2);transform:translateY(-1px);}
+.btn-lap:disabled{opacity:0.35;cursor:not-allowed;transform:none!important;}
+
+.btn-reset{
+  padding:14px 22px;
+  background:var(--surface2);color:var(--muted);
+  border:1.5px solid var(--border);
+}
+.btn-reset:hover{background:#fff0f5;color:var(--pink);border-color:#f8bbd9;transform:translateY(-1px);}
+
+/* ── lap section ── */
+.lap-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:12px;
+}
+.lap-title{font-size:0.75rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);}
+.lap-count{font-size:0.72rem;font-weight:500;color:var(--accent-light);background:var(--surface2);padding:2px 8px;border-radius:100px;border:1px solid var(--border);}
+
+.lap-list{
+  max-height:220px;overflow-y:auto;
+  display:flex;flex-direction:column;gap:6px;
+  padding-right:4px;
+}
+.lap-list::-webkit-scrollbar{width:4px;}
+.lap-list::-webkit-scrollbar-track{background:var(--bg2);border-radius:4px;}
+.lap-list::-webkit-scrollbar-thumb{background:var(--accent-light);border-radius:4px;}
+
+.lap-item{
+  display:flex;align-items:center;
+  background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:10px 14px;
+  gap:12px;
+  animation:slideIn 0.3s ease both;
+  transition:transform 0.2s,box-shadow 0.2s;
+}
+.lap-item:hover{transform:translateX(3px);box-shadow:0 2px 12px rgba(108,92,231,0.08);}
+.lap-item.fastest{border-color:rgba(0,184,148,0.4);background:rgba(0,184,148,0.05);}
+.lap-item.slowest{border-color:rgba(232,67,147,0.3);background:rgba(232,67,147,0.04);}
+
+.lap-num{
+  width:26px;height:26px;border-radius:8px;
+  background:var(--accent);color:#fff;
+  font-size:0.7rem;font-weight:700;
+  display:grid;place-items:center;flex-shrink:0;
+}
+.lap-item.fastest .lap-num{background:var(--teal);}
+.lap-item.slowest .lap-num{background:var(--pink);}
+
+.lap-info{flex:1;}
+.lap-time{font-family:var(--font-mono);font-size:0.95rem;font-weight:400;color:var(--text);}
+.lap-delta{font-size:0.72rem;color:var(--muted);margin-top:1px;}
+.lap-delta.faster{color:var(--teal);}
+.lap-delta.slower{color:var(--pink);}
+
+.lap-badge{font-size:0.65rem;font-weight:600;padding:2px 8px;border-radius:100px;letter-spacing:0.04em;}
+.lap-badge.best{background:rgba(0,184,148,0.12);color:var(--teal);}
+.lap-badge.worst{background:rgba(232,67,147,0.1);color:var(--pink);}
+
+/* empty state */
+.empty-state{text-align:center;padding:32px 0 16px;color:var(--muted);}
+.empty-state svg{width:40px;height:40px;stroke:var(--border);fill:none;stroke-width:1.5;margin-bottom:10px;}
+.empty-state p{font-size:0.85rem;}
+
+/* ── bottom stats bar ── */
+.stats-bar{
+  position:relative;z-index:1;
+  display:flex;gap:10px;width:100%;max-width:480px;margin-top:14px;
+  animation:fadeUp 0.6s 0.25s ease both;
+}
+.stat-pill{
+  flex:1;background:var(--surface);border:1px solid var(--border);
+  border-radius:14px;padding:12px 16px;text-align:center;
+  box-shadow:0 2px 8px rgba(108,92,231,0.06);
+}
+.stat-val{font-family:var(--font-mono);font-size:1.05rem;font-weight:400;color:var(--text);}
+.stat-label{font-size:0.68rem;font-weight:500;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-top:2px;}
+
+/* ── animations ── */
+@keyframes fadeDown{from{opacity:0;transform:translateY(-16px);}to{opacity:1;transform:translateY(0);}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+@keyframes slideIn{from{opacity:0;transform:translateX(-14px);}to{opacity:1;transform:translateX(0);}}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0.3;}}
+@keyframes ripple{0%{transform:scale(0);opacity:0.6;}100%{transform:scale(3);opacity:0;}}
+
+/* ripple on btn */
+.btn{position:relative;overflow:hidden;}
+.btn .ripple-el{position:absolute;border-radius:50%;background:rgba(255,255,255,0.35);width:60px;height:60px;margin-top:-30px;margin-left:-30px;animation:ripple 0.5s ease-out forwards;pointer-events:none;}
+
+/* divider */
+.divider{height:1px;background:var(--border);margin:20px 0;}
+</style>
+</head>
+<body>
+
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+<div class="orb orb3"></div>
+
+<!-- Header -->
+<header>
+  <div class="brand">
+    <div class="brand-mark">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/><line x1="12" y1="3" x2="12" y2="1"/></svg>
+    </div>
+    <div class="brand-name">Skill<span>Craft</span></div>
+  </div>
+  <h1>Precision Stopwatch</h1>
+</header>
+
+<!-- Main Card -->
+<div class="card">
+
+  <!-- Ring Clock -->
+  <div class="clock-wrap">
+    <!-- Tick marks -->
+    <div class="ticks" id="ticks"></div>
+
+    <svg class="ring-svg" viewBox="0 0 260 260">
+      <!-- Hour ring -->
+      <circle class="ring-track" cx="130" cy="130" r="80"/>
+      <circle class="ring-progress ring-hr" id="ring-hr" cx="130" cy="130" r="80"/>
+      <!-- Minute ring -->
+      <circle class="ring-track" cx="130" cy="130" r="90"/>
+      <circle class="ring-progress ring-min" id="ring-min" cx="130" cy="130" r="90"/>
+      <!-- Second ring -->
+      <circle class="ring-track" cx="130" cy="130" r="100"/>
+      <circle class="ring-progress ring-sec" id="ring-sec" cx="130" cy="130" r="100"/>
+    </svg>
+
+    <div class="clock-inner">
+      <div class="time-display">
+        <span id="disp-hms">00:00:00</span><span class="ms">.<span id="disp-ms">00</span></span>
+      </div>
+      <div class="status-badge" id="status-badge">
+        <span class="dot"></span><span id="status-text">Ready</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn btn-lap" id="btn-lap" disabled onclick="addLap(this)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12"/></svg>
+      Lap
+    </button>
+    <button class="btn btn-start" id="btn-start" onclick="toggleStart(this)">
+      <svg id="start-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      <span id="start-label">Start</span>
+    </button>
+    <button class="btn btn-reset" id="btn-reset" onclick="resetTimer(this)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
+      Reset
+    </button>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- Lap List -->
+  <div class="lap-header">
+    <span class="lap-title">Lap Times</span>
+    <span class="lap-count" id="lap-count">0 laps</span>
+  </div>
+  <div class="lap-list" id="lap-list">
+    <div class="empty-state" id="empty-state">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+      <p>No laps recorded yet</p>
+    </div>
+  </div>
+</div>
+
+<!-- Stats Bar -->
+<div class="stats-bar">
+  <div class="stat-pill">
+    <div class="stat-val" id="stat-best">--:--</div>
+    <div class="stat-label">Best Lap</div>
+  </div>
+  <div class="stat-pill">
+    <div class="stat-val" id="stat-worst">--:--</div>
+    <div class="stat-label">Worst Lap</div>
+  </div>
+  <div class="stat-pill">
+    <div class="stat-val" id="stat-avg">--:--</div>
+    <div class="stat-label">Average</div>
+  </div>
+</div>
+
+<script>
+/* ── tick marks ── */
+const ticksEl = document.getElementById('ticks');
+for(let i=0;i<60;i++){
+  const t=document.createElement('div');
+  t.className='tick'+(i%5===0?' major':'');
+  t.style.transform=`rotate(${i*6}deg)`;
+  ticksEl.appendChild(t);
+}
+
+/* ── state ── */
+let running=false, startTime=0, elapsed=0, lapStart=0;
+let rafId=null;
+let laps=[];
+
+/* ── elements ── */
+const dispHMS=document.getElementById('disp-hms');
+const dispMS =document.getElementById('disp-ms');
+const badge  =document.getElementById('status-badge');
+const badgeTxt=document.getElementById('status-text');
+const btnStart=document.getElementById('btn-start');
+const btnLap  =document.getElementById('btn-lap');
+const startIcon=document.getElementById('start-icon');
+const startLabel=document.getElementById('start-label');
+const lapList =document.getElementById('lap-list');
+const emptyState=document.getElementById('empty-state');
+const lapCountEl=document.getElementById('lap-count');
+const ringSec=document.getElementById('ring-sec');
+const ringMin=document.getElementById('ring-min');
+const ringHr =document.getElementById('ring-hr');
+const statBest=document.getElementById('stat-best');
+const statWorst=document.getElementById('stat-worst');
+const statAvg=document.getElementById('stat-avg');
+
+/* ── format helpers ── */
+function fmt(ms){
+  const h=Math.floor(ms/3600000);
+  const m=Math.floor((ms%3600000)/60000);
+  const s=Math.floor((ms%60000)/1000);
+  const c=Math.floor((ms%1000)/10);
+  const hms=(h>0?pad(h)+':':'')+pad(m)+':'+pad(s);
+  return {hms, ms:pad(c), total:ms, h,m,s,c};
+}
+function pad(n){return String(n).padStart(2,'0');}
+function fmtShort(ms){
+  if(ms===null||ms===undefined||isNaN(ms)) return '--:--';
+  const m=Math.floor(ms/60000);
+  const s=Math.floor((ms%60000)/1000);
+  const c=Math.floor((ms%1000)/10);
+  return pad(m)+':'+pad(s)+'.'+pad(c);
+}
+
+/* ── ring update ── */
+function updateRings(h,m,s,c){
+  const secFrac=(s*100+c)/6000; // 0–1 per minute
+  const minFrac=(m+(s/60))/60;
+  const hrFrac =(h+(m/60))/12;
+  const circumSec=2*Math.PI*100;
+  const circumMin=2*Math.PI*90;
+  const circumHr =2*Math.PI*80;
+  ringSec.style.strokeDashoffset=circumSec-(circumSec*secFrac);
+  ringMin.style.strokeDashoffset=circumMin-(circumMin*minFrac);
+  ringHr.style.strokeDashoffset =circumHr -(circumHr *hrFrac);
+}
+
+/* ── render loop ── */
+function render(){
+  const now=performance.now();
+  const t=elapsed+(now-startTime);
+  const f=fmt(t);
+  dispHMS.textContent=f.hms;
+  dispMS.textContent=f.ms;
+  updateRings(f.h,f.m,f.s,f.c);
+  rafId=requestAnimationFrame(render);
+}
+
+/* ── toggle start/pause ── */
+function toggleStart(btn){
+  rippleEffect(btn,event);
+  if(!running){
+    startTime=performance.now();
+    lapStart=lapStart||startTime;
+    running=true;
+    rafId=requestAnimationFrame(render);
+    badge.className='status-badge running';
+    badgeTxt.textContent='Running';
+    startIcon.innerHTML='<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+    startLabel.textContent='Pause';
+    btn.classList.add('running');
+    btnLap.disabled=false;
+  } else {
+    elapsed+=performance.now()-startTime;
+    cancelAnimationFrame(rafId);
+    running=false;
+    badge.className='status-badge paused';
+    badgeTxt.textContent='Paused';
+    startIcon.innerHTML='<polygon points="5 3 19 12 5 21 5 3"/>';
+    startLabel.textContent='Resume';
+    btn.classList.remove('running');
+  }
+}
+
+/* ── add lap ── */
+function addLap(btn){
+  if(!running) return;
+  rippleEffect(btn,event);
+  const now=performance.now();
+  const totalMs=elapsed+(now-startTime);
+  const lapMs=elapsed+(now-startTime)-(laps.reduce((a,l)=>a+l.ms,0));
+  laps.unshift({num:laps.length+1, total:totalMs, ms:lapMs});
+  laps[0].num=laps.length; // fix num
+  // re-number
+  laps.forEach((l,i)=>l.num=laps.length-i);
+  lapStart=now;
+  renderLaps();
+  updateStats();
+}
+
+/* ── render laps ── */
+function renderLaps(){
+  if(laps.length===0){emptyState.style.display='';return;}
+  emptyState.style.display='none';
+  lapCountEl.textContent=laps.length+' lap'+(laps.length!==1?'s':'');
+  const times=laps.map(l=>l.ms);
+  const best=Math.min(...times), worst=Math.max(...times);
+  lapList.innerHTML='';
+  laps.forEach((lap,i)=>{
+    const isBest=laps.length>1&&lap.ms===best;
+    const isWorst=laps.length>1&&lap.ms===worst;
+    const prev=laps[i+1];
+    const delta=prev?lap.ms-prev.ms:null;
+    const div=document.createElement('div');
+    div.className='lap-item'+(isBest?' fastest':isWorst?' slowest':'');
+    div.style.animationDelay=(i===0?'0s':'0.05s');
+    div.innerHTML=`
+      <div class="lap-num">${lap.num}</div>
+      <div class="lap-info">
+        <div class="lap-time">${fmtShort(lap.ms)}</div>
+        ${delta!==null?`<div class="lap-delta ${delta<0?'faster':'slower'}">${delta<0?'▲':'▼'} ${fmtShort(Math.abs(delta))} vs prev</div>`:`<div class="lap-delta">—</div>`}
+      </div>
+      ${isBest?'<span class="lap-badge best">Best</span>':isWorst?'<span class="lap-badge worst">Slow</span>':''}
+    `;
+    lapList.appendChild(div);
+  });
+}
+
+/* ── update stats ── */
+function updateStats(){
+  if(laps.length===0){statBest.textContent=statWorst.textContent=statAvg.textContent='--:--';return;}
+  const times=laps.map(l=>l.ms);
+  statBest.textContent=fmtShort(Math.min(...times));
+  statWorst.textContent=fmtShort(Math.max(...times));
+  statAvg.textContent=fmtShort(times.reduce((a,b)=>a+b,0)/times.length);
+}
+
+/* ── reset ── */
+function resetTimer(btn){
+  rippleEffect(btn,event);
+  cancelAnimationFrame(rafId);
+  running=false;elapsed=0;lapStart=0;laps=[];
+  dispHMS.textContent='00:00:00';dispMS.textContent='00';
+  updateRings(0,0,0,0);
+  badge.className='status-badge';badgeTxt.textContent='Ready';
+  startIcon.innerHTML='<polygon points="5 3 19 12 5 21 5 3"/>';
+  startLabel.textContent='Start';
+  btnStart.classList.remove('running');
+  btnLap.disabled=true;
+  emptyState.style.display='';
+  lapList.innerHTML='';lapList.appendChild(emptyState);
+  lapCountEl.textContent='0 laps';
+  updateStats();
+}
+
+/* ── ripple ── */
+function rippleEffect(btn, e){
+  const r=document.createElement('span');
+  r.className='ripple-el';
+  const rect=btn.getBoundingClientRect();
+  r.style.left=(e&&e.clientX?e.clientX-rect.left:rect.width/2)+'px';
+  r.style.top=(e&&e.clientY?e.clientY-rect.top:rect.height/2)+'px';
+  btn.appendChild(r);
+  setTimeout(()=>r.remove(),500);
+}
+
+/* init rings */
+updateRings(0,0,0,0);
+</script>
+</body>
+</html>
